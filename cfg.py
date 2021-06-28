@@ -1,4 +1,5 @@
 import threading
+from enum import Enum
 
 
 class Config(object):
@@ -6,27 +7,31 @@ class Config(object):
     NUM_DATA_SERVER = 4
     NUM_REPLICATION = 4
 
-    server_chunk_map = {}  # datanode -> chunks
-    read_chunk = None
-    read_offset = None
-    read_count = None
+    def __init__(self):
+        self.server_chunk_map = {}  # datanode -> chunks
+        self.read_chunk = None
+        self.read_offset = None
+        self.read_count = None
 
-    cmd_flag = False
-    cmd_type = None
-    file_id = None
-    file_dir = None  # read or fetch using dir/filename
-    file_path = None  # local source path
+        self.cmd_flag = False
+        self.cmd_type = None
+        self.file_id = None
+        self.file_dir = None  # read or fetch using dir/filename
+        self.file_path = None  # local source path
 
-    save_path = None  # put2 save using dir on DFS
-    fetch_path = None  # download on local
-    fetch_servers = []
-    fetch_chunks = None
+        self.save_path = None  # put2 save using dir on DFS
+        self.fetch_path = None  # download on local
+        self.fetch_servers = []
+        self.fetch_chunks = None
 
-    # events
-    name_event = threading.Event()
-    ls_event = threading.Event()
-    read_event = threading.Event()
-    mkdir_event = threading.Event()
+        # events
+        self.name_event = threading.Event()
+        self.ls_event = threading.Event()
+        self.read_event = threading.Event()
+        self.mkdir_event = threading.Event()
 
-    data_events = [threading.Event() for _ in range(NUM_DATA_SERVER)]
-    main_events = [threading.Event() for _ in range(NUM_DATA_SERVER)]
+        self.data_events = [threading.Event() for _ in range(self.NUM_DATA_SERVER)]
+        self.main_events = [threading.Event() for _ in range(self.NUM_DATA_SERVER)]
+
+        self.operation_names = ('upload', 'read', 'fetch', 'quit', 'mkdir', 'help')
+        self.COMMAND = Enum('COMMAND', self.operation_names)
