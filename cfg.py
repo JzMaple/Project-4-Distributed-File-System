@@ -3,9 +3,22 @@ from enum import Enum
 
 
 class Config(object):
+    # DFS Meta Data
     CHUNK_SIZE = 2 * 1024 * 1024
     NUM_DATA_SERVER = 4
     NUM_REPLICATION = 4
+    CHUNK_PATTERN = '%s-part-%s'
+
+    # Name Node Meta Data
+    NAME_NODE_META_PATH = './dfs/name/meta.pkl'
+
+    # Data Node
+    DATA_NODE_DIR = './dfs/data-%s'
+    LS_PATTERN = '%s\t%20s\t%10s'
+
+    # Operations
+    operation_names = ('upload', 'read', 'fetch', 'quit', 'mkdir', "ls", "help")
+    COMMAND = Enum('COMMAND', operation_names)
 
     def __init__(self):
         self.server_chunk_map = {}  # datanode -> chunks
@@ -33,5 +46,4 @@ class Config(object):
         self.data_events = [threading.Event() for _ in range(self.NUM_DATA_SERVER)]
         self.main_events = [threading.Event() for _ in range(self.NUM_DATA_SERVER)]
 
-        self.operation_names = ('upload', 'read', 'fetch', 'quit', 'mkdir', 'help')
-        self.COMMAND = Enum('COMMAND', self.operation_names)
+

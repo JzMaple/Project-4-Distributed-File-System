@@ -1,18 +1,20 @@
 import math
-import threading
-import pickle
+import random
 import os
+import pickle
+import threading
+
 from file_system import FileTree
 
 
-class NameNode(threading.Thread):
+class NameSever(threading.Thread):
     """
     Name Server，handle instructions and manage data servers
     Client can use `ls, read, fetch` cmds.
     """
 
     def __init__(self, name, cfg):
-        super(NameNode, self).__init__(name=name)
+        super(NameSever, self).__init__(name=name)
         self.cfg = cfg  # global parameters
         self.metas = None
         self.id_chunk_map = None  # file id -> chunk, eg. {0: ['0-part-0'], 1: ['1-part-0']}
@@ -28,23 +30,23 @@ class NameNode(threading.Thread):
         while True:
             # waiting for cmds
             cfg.name_event.wait()
-
+            print("name sever start")
             if cfg.cmd_flag:
                 if cfg.cmd_type == self.cfg.COMMAND.upload:
-                    self.put()
+                    self.upload()
                 elif cfg.cmd_type == self.cfg.COMMAND.read:
                     self.read()
-                elif cfg.cmd_type in [self.cfg.COMMAND.fetch, self.cfg.COMMAND.Fetch]:
+                elif cfg.cmd_type == self.cfg.COMMAND.fetch:
                     self.fetch()
-                elif cfg.cmd_type in [self.cfg.COMMAND.ls, self.cfg.COMMAND.Ls]:
+                elif cfg.cmd_type == self.cfg.COMMAND.ls:
                     self.ls()
-                elif cfg.cmd_type == self.cfg.COMMAND.delete:
-                    self.delete()
                 elif cfg.cmd_type == self.cfg.COMMAND.mkdir:
+                    print("dir", cfg.file_dir)
                     self.tree.insert(cfg.file_dir)
                     self.cfg.mkdir_event.set()
                 else:
                     pass
+            print("name sever sleep")
             cfg.name_event.clear()
 
     def load_meta(self):
@@ -70,46 +72,48 @@ class NameNode(threading.Thread):
         self.tree = self.metas['tree']
 
     def update_meta(self):
-        """update Name Node Meta Data after put"""
+        """update Name Node Meta Data after upload"""
 
         with open(self.cfg.NAME_NODE_META_PATH, 'wb') as f:
             self.metas['last_file_id'] = self.last_file_id
             self.metas['last_data_server_id'] = self.last_data_server_id
             pickle.dump(self.metas, f)
 
-    def delete(self):
-        '''delete a datasever'''
-        pass
-
     def ls(self):
         """ls print meta data info"""
         print('total', len(self.id_file_map))
-        if self.cfg.cmd_type == self.cfg.COMMAND.Ls:
-            self.tree.view(self.id_file_map)
-        else:
-            for file_id, (file_name, file_len) in self.id_file_map.items():
-                print(self.cfg.LS_PATTERN % (file_id, file_name, file_len))
+        print("file dir tree:")
+        self.tree.view(self.id_file_map)
+        for file_id, (file_name, file_len) in self.id_file_map.items():
+            print(self.cfg.LS_PATTERN % (file_id, file_name, file_len))
         self.cfg.ls_event.set()
 
-    def put(self):
-        """split input file into chunk, then sent to differenct chunks"""
+    def upload(self):
+        """split input file into chunk, then sent to different chunks"""
 
         in_path = self.cfg.file_path
+        print("in_path", in_path)
 
         file_name = in_path.split('/')[-1]
         self.last_file_id += 1
+        print("file_name", file_name)
+
         # update file tree
         if self.cfg.cmd_type == self.cfg.COMMAND.upload:
-            dir = self.cfg.put_savepath
-            if dir[0] == '/': dir = dir[1:]
-            if dir[-1] == '/': dir = dir[:-1]
+            dir = self.cfg.save_path
+            if dir[0] == '/':
+                dir = dir[1:]
+            if dir[-1] == '/':
+                dir = dir[:-1]
             self.tree.insert(dir, self.last_file_id)
             # self.tree.add(self.last_file_id)
 
         server_id = (self.last_data_server_id + 1) % self.cfg.NUM_REPLICATION
+        print("server_id", server_id)
 
         file_length = os.path.getsize(in_path)
         chunks = int(math.ceil(float(file_length) / self.cfg.CHUNK_SIZE))
+        print("chunks", chunks)
 
         # generate chunk, add into <id, chunk> mapping
         self.id_chunk_map[self.last_file_id] = [self.cfg.CHUNK_PATTERN % (self.last_file_id, i) for i in range(chunks)]
@@ -121,6 +125,7 @@ class NameNode(threading.Thread):
             # copy to 4 data nodes
             for j in range(self.cfg.NUM_REPLICATION):
                 assign_server = (server_id + j) % self.cfg.NUM_DATA_SERVER
+                print("assign_server", assign_server)
                 self.chunk_server_map[chunk].append(assign_server)
 
                 # add chunk-server info to global variable
@@ -143,8 +148,6 @@ class NameNode(threading.Thread):
 
         cfg = self.cfg
         file_id = cfg.file_id
-        read_offset = cfg.read_offset
-        read_count = cfg.read_count
 
         # find file_id
         try:
@@ -159,6 +162,15 @@ class NameNode(threading.Thread):
                 print('No such file:', file_dir)
                 cfg.read_event.set()
                 return False
+
+        if cfg.read_offset is not None:
+            read_offset = cfg.read_offset
+        else:
+            read_offset = 0
+        if cfg.read_count is not None:
+            read_count = cfg.read_count
+        else:
+            read_count = self.id_file_map[file_id][1] - read_offset
 
         if file_id not in self.id_file_map:
             print('No such file with id =', file_id)
@@ -179,7 +191,7 @@ class NameNode(threading.Thread):
             else:
                 # randomly select a data server to read chunk
                 read_server_candidates = self.chunk_server_map[self.cfg.CHUNK_PATTERN % (file_id, start_chunk)]
-                read_server_id = choice(read_server_candidates)
+                read_server_id = random.choice(read_server_candidates)
                 cfg.read_chunk = self.cfg.CHUNK_PATTERN % (file_id, start_chunk)
                 cfg.read_offset = read_offset - start_chunk * self.cfg.CHUNK_SIZE
                 cfg.data_events[read_server_id].set()
@@ -195,8 +207,9 @@ class NameNode(threading.Thread):
         file_id = cfg.file_id
 
         # find file_id
-        file_dir = cfg.file_dir
-        if self.cfg.cmd_type == self.cfg.COMMAND.Fetch:
+        if file_id is None:
+            assert cfg.file_path is not None
+            file_dir = cfg.file_path
             file_id = self.tree.get_id_by_path(file_dir, self.id_file_map)
             cfg.file_id = file_id
             if file_id < 0:
@@ -205,6 +218,11 @@ class NameNode(threading.Thread):
                 for data_event in cfg.data_events:
                     data_event.set()
                 return None
+        else:
+            try:
+                file_id = int(file_id)
+            except ValueError:
+                file_id = file_id
 
         if file_id not in self.id_file_map:
             cfg.fetch_chunks = -1

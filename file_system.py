@@ -1,11 +1,7 @@
-# 1. insert dir
-# 2. insert file id
-# 3. get dir
-# 4. tree view print
 import os
 
 
-class FileTree:
+class FileTree(object):
     """ File tree"""
 
     def __init__(self):
@@ -75,7 +71,8 @@ class FileTree:
             for dir in dirs:
                 cnt += 1
                 print(pad + '|')
-                if dir == '.': continue
+                if dir == '.':
+                    continue
                 if cnt == len(dirs):
                     _view(tree[dir], pad + ' ', dir)
                 else:
@@ -90,13 +87,14 @@ if __name__ == '__main__':
                    2: ('file3.txt', 200),
                    3: ('readme.txt', 600)}
     tree = FileTree()
-    tree.add(0)
-    tree.add(1)
+    # tree.add(0)
+    # tree.add(1)
 
-    tree.insert('dir1', 2)
-    tree.insert('dir2', 3)
-    tree.insert('dir3/sub-dir3-1', 0)
-    tree.insert('dir3/dir1/dir2', 1)
+    tree.insert('dir4')
+    # tree.insert('dir1', 2)
+    # tree.insert('dir2', 3)
+    # tree.insert('dir3/sub-dir3-1', 0)
+    # tree.insert('dir3/dir1/dir2', 1)
     for key in tree.tree.keys():
         print(key)
     print(tree.tree)
