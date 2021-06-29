@@ -30,7 +30,6 @@ class NameSever(threading.Thread):
         while True:
             # waiting for cmds
             cfg.name_event.wait()
-            print("name sever start")
             if cfg.cmd_flag:
                 if cfg.cmd_type == self.cfg.COMMAND.upload:
                     self.upload()
@@ -41,12 +40,11 @@ class NameSever(threading.Thread):
                 elif cfg.cmd_type == self.cfg.COMMAND.ls:
                     self.ls()
                 elif cfg.cmd_type == self.cfg.COMMAND.mkdir:
-                    print("dir", cfg.file_dir)
                     self.tree.insert(cfg.file_dir)
                     self.cfg.mkdir_event.set()
+                    self.ls()
                 else:
                     pass
-            print("name sever sleep")
             cfg.name_event.clear()
 
     def load_meta(self):
@@ -92,11 +90,9 @@ class NameSever(threading.Thread):
         """split input file into chunk, then sent to different chunks"""
 
         in_path = self.cfg.file_path
-        print("in_path", in_path)
 
         file_name = in_path.split('/')[-1]
         self.last_file_id += 1
-        print("file_name", file_name)
 
         # update file tree
         if self.cfg.cmd_type == self.cfg.COMMAND.upload:
@@ -109,11 +105,9 @@ class NameSever(threading.Thread):
             # self.tree.add(self.last_file_id)
 
         server_id = (self.last_data_server_id + 1) % self.cfg.NUM_REPLICATION
-        print("server_id", server_id)
 
         file_length = os.path.getsize(in_path)
         chunks = int(math.ceil(float(file_length) / self.cfg.CHUNK_SIZE))
-        print("chunks", chunks)
 
         # generate chunk, add into <id, chunk> mapping
         self.id_chunk_map[self.last_file_id] = [self.cfg.CHUNK_PATTERN % (self.last_file_id, i) for i in range(chunks)]

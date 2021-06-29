@@ -4,7 +4,6 @@ import os
 def cmd_process(inputs, cfg):
     flag = True
     try:
-        print("inputs", inputs)
         if inputs[0] == "upload":
             # upload --src=* --save=*
             assert len(inputs) == 5
